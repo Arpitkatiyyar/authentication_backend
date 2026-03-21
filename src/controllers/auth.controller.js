@@ -6,9 +6,8 @@ import otpModel from "../models/otp.model.js";
 import sessionModel from "../models/session.model.js";
 import {sendEmail} from "../services/email.services.js"
 import jwt from "jsonwebtoken" 
-import authRouter from "../routes/auth.routes.js";
-import { strict } from "assert";
-import { decode } from "punycode";
+import { loginLimiter } from "../middleware/rateLimiter.js";
+ 
 
 export async function register(req,res) {
     const {username,email,password}=req.body
@@ -117,6 +116,7 @@ export async function login(req,res){
         },
         accessToken
     })
+    req.loginLimiter?.resetKey(req.ip + "-" + req.body.email);
 }
 
 export async function getMe(req,res){
@@ -195,9 +195,9 @@ export async function refreshToken(req,res){
         accessToken,
         username:decoded.username
     })
-    console.log(decoded.id);
-    console.log(decoded.username)
-    console.log(decoded)
+    // console.log(decoded.id);
+    // console.log(decoded.username)
+    // console.log(decoded)
 
 }
 
@@ -295,7 +295,7 @@ export async function resendOtp(req,res){
     const user=await userModel.findOne({
         email
     })
-    console.log(user)
+    // console.log(user)
 
     const otp=otpGenrate();
     const html=getOtpHtml(otp);

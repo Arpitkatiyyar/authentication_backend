@@ -1,11 +1,11 @@
 import { Router } from "express";
 import * as authController from "../controllers/auth.controller.js"
-
+import { loginLimiter,loginSlowdown } from "../middleware/rateLimiter.js";
 const authRouter=Router()
 
 authRouter.post("/register",authController.register)
 
-authRouter.post("/login",authController.login)
+authRouter.post("/login",loginLimiter,loginSlowdown,authController.login)
 
 authRouter.get("/get-me",authController.getMe)
 

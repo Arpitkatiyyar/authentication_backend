@@ -1,5 +1,5 @@
 import userModel from "../models/user.model.js";
-import crypto from "crypto"
+import crypto, { generateKey } from "crypto"
 import config from "../config/config.js";
 import { otpGenrate,getOtpHtml } from "../utils/utils.js";
 import otpModel from "../models/otp.model.js";
@@ -311,5 +311,82 @@ export async function resendOtp(req,res){
 
     res.status(200).json({
         message:"otp resend succesfully"
+    })
+}
+
+export async function forgetPassword(req,res){
+    const {email} = req.body;
+
+    const user=await userModel.findOne({email});
+
+    if(!user){
+        return res.status(409).json({
+            message:"user didn't exists"
+        })
+    }
+
+    const otp = otpGenrate();
+    const html = getOtpHtml(otp);
+
+    const otpHash=crypto.createHash("sha256").update(otp).digest("hex");
+    await otpModel.create({
+        email,
+        user:user._id,
+        otpHash
+    })
+    await sendEmail(email,"otp for forget password",`your otp is ${otp}`,html)
+    
+    res.status(200).json({
+        message:"otp sent"
+    })
+    // console.log(password)
+}
+
+export async function resetPassword(req,res){
+    const {email,otp,password}=req.body;
+    const user=await userModel.findOne({email});
+
+    if(!user){
+        res.status(403).json({
+            message:"no user found"
+        })
+    }
+
+
+
+
+    const otpHash=crypto.createHash("sha256").update(otp).digest("hex");
+    const otpDoc=await otpModel.findOne({
+        email,
+        otpHash
+    })
+    if(!otpDoc){
+        return res.status(403).json({
+            message:"incorrect otp"
+        })
+    }
+
+    const now = Date.now();
+    const age = now - otpDoc.createdAt.getTime();
+    if (age > 5*60 * 1000) {
+      await otpModel.deleteMany({
+        user: otpDoc.user,
+      }); // 5 minutes
+      return res.status(403).json({
+        message: "otp expired",
+      });
+    }
+
+    const passwordHash=crypto.createHash("sha256").update(password).digest("hex")
+    const newUser=await userModel.findOneAndUpdate(
+        {email},
+        {password:passwordHash},
+        { new: true, runValidators: true } 
+    )
+    await otpModel.deleteMany({
+        user:otpDoc.user
+    })
+    res.status(200).json({
+        message:"password updated succesfully"
     })
 }
